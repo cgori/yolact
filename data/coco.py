@@ -177,7 +177,7 @@ class COCODetection(data.Dataset):
         return torch.from_numpy(img).permute(2, 0, 1), target, masks, height, width, num_crowds
 
     def pull_image(self, index):
-        '''Returns the original image object at index in PIL form
+        '''Returns the input image object at index in PIL form
 
         Note: not using self.__getitem__(), as any transformations passed in
         could mess up this functionality.
@@ -192,7 +192,7 @@ class COCODetection(data.Dataset):
         return cv2.imread(osp.join(self.root, path), cv2.IMREAD_COLOR)
 
     def pull_anno(self, index):
-        '''Returns the original annotation of image at index
+        '''Returns the input annotation of image at index
 
         Note: not using self.__getitem__(), as any transformations passed in
         could mess up this functionality.

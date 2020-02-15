@@ -128,6 +128,21 @@ dataset_base = Config({
     'label_map': None
 })
 
+my_custom_dataset = dataset_base.copy({
+    'name': 'My Dataset',
+
+    'train_images': 'data/oo/',
+    'train_info':   'data/oo/annotations.json',
+
+
+    'valid_images': 'data/oo/',
+    'valid_info':   'data/oo/annotations.json',
+    'has_gt': True,
+
+    'class_names': ("pcat")
+
+})
+
 coco2014_dataset = dataset_base.copy({
     'name': 'COCO 2014',
     
@@ -225,7 +240,7 @@ backbone_base = Config({
 
 resnet101_backbone = backbone_base.copy({
     'name': 'ResNet101',
-    'path': 'resnet101_reducedfc.pth',
+    'path': 'yolact_plus_base_54_800000.pth',
     'type': ResNetBackbone,
     'args': ([3, 4, 23, 3],),
     'transform': resnet_transform,
@@ -599,7 +614,7 @@ coco_base_config = Config({
     'train_masks': True,
     'train_boxes': True,
     # If enabled, the gt masks will be cropped using the gt bboxes instead of the predicted ones.
-    # This speeds up training time considerably but results in much worse mAP at test time.
+    # This speeds up training time considerably but output in much worse mAP at test time.
     'use_gt_bboxes': False,
 
     # Whether or not to preserve aspect ratio when resizing the image.
@@ -657,16 +672,16 @@ yolact_base_config = coco_base_config.copy({
     'name': 'yolact_base',
 
     # Dataset stuff
-    'dataset': coco2017_dataset,
-    'num_classes': len(coco2017_dataset.class_names) + 1,
+    'dataset': my_custom_dataset,
+    'num_classes': len(my_custom_dataset.class_names) + 1,
 
     # Image Size
     'max_size': 550,
-    
+
     # Training params
     'lr_steps': (280000, 600000, 700000, 750000),
     'max_iter': 800000,
-    
+
     # Backbone Settings
     'backbone': resnet101_backbone.copy({
         'selected_layers': list(range(1, 4)),

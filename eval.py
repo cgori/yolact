@@ -28,7 +28,7 @@ from PIL import Image
 
 import matplotlib.pyplot as plt
 import cv2
-
+bestBB = []
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
         return True
@@ -60,10 +60,10 @@ def parse_args(argv=None):
     parser.add_argument('--display_scores', default=True, type=str2bool,
                         help='Whether or not to display scores in addition to classes')
     parser.add_argument('--display', dest='display', action='store_true',
-                        help='Display qualitative results instead of quantitative ones.')
+                        help='Display qualitative output instead of quantitative ones.')
     parser.add_argument('--shuffle', dest='shuffle', action='store_true',
                         help='Shuffles the images when displaying them. Doesn\'t have much of an effect when display is off though.')
-    parser.add_argument('--ap_data_file', default='results/ap_data.pkl', type=str,
+    parser.add_argument('--ap_data_file', default='output/ap_data.pkl', type=str,
                         help='In quantitative mode, the file to save detections before calculating mAP.')
     parser.add_argument('--resume', dest='resume', action='store_true',
                         help='If display not set, this resumes mAP calculations from the ap_data_file.')
@@ -71,10 +71,10 @@ def parse_args(argv=None):
                         help='The maximum number of images from the dataset to consider. Use -1 for all.')
     parser.add_argument('--output_coco_json', dest='output_coco_json', action='store_true',
                         help='If display is not set, instead of processing IoU values, this just dumps detections into the coco json file.')
-    parser.add_argument('--bbox_det_file', default='results/bbox_detections.json', type=str,
-                        help='The output file for coco bbox results if --coco_results is set.')
-    parser.add_argument('--mask_det_file', default='results/mask_detections.json', type=str,
-                        help='The output file for coco mask results if --coco_results is set.')
+    parser.add_argument('--bbox_det_file', default='output/bbox_detections.json', type=str,
+                        help='The output file for coco bbox output if --coco_results is set.')
+    parser.add_argument('--mask_det_file', default='output/mask_detections.json', type=str,
+                        help='The output file for coco mask output if --coco_results is set.')
     parser.add_argument('--config', default=None,
                         help='The config object to use.')
     parser.add_argument('--output_web_json', dest='output_web_json', action='store_true',
@@ -120,7 +120,6 @@ def parse_args(argv=None):
 
     global args
     args = parser.parse_args(argv)
-
     if args.output_web_json:
         args.output_coco_json = True
     
@@ -136,6 +135,8 @@ def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, ma
     """
     Note: If undo_transform=False then im_h and im_w are allowed to be None.
     """
+
+
     if undo_transform:
         img_numpy = undo_image_transformation(img, w, h)
         img_gpu = torch.Tensor(img_numpy).cuda()
@@ -157,7 +158,12 @@ def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, ma
         if cfg.eval_mask_branch:
             # Masks are drawn on the GPU, so don't copy
             masks = t[3][idx]
+
         classes, scores, boxes = [x[idx].cpu().numpy() for x in t[:3]]
+
+        for index, val in enumerate(zip(classes, scores, boxes)):
+            print(classes[index], boxes[index], scores[index],'index', index)
+
 
     num_dets_to_consider = min(args.top_k, classes.shape[0])
     for j in range(num_dets_to_consider):
@@ -188,26 +194,11 @@ def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, ma
     # I wish I had access to OpenGL or Vulkan but alas, I guess Pytorch tensor operations will have to suffice
     if args.display_masks and cfg.eval_mask_branch and num_dets_to_consider > 0:
         # After this, mask is of size [num_dets, h, w, 1]
-        masks = masks[:num_dets_to_consider, :, :, None]
-        
-        # Prepare the RGB images for each mask given their color (size [num_dets, h, w, 1])
-        colors = torch.cat([get_color(j, on_gpu=img_gpu.device.index).view(1, 1, 1, 3) for j in range(num_dets_to_consider)], dim=0)
-        masks_color = masks.repeat(1, 1, 1, 3) * colors * mask_alpha
+        masks = masks[:1, :, :, None]
+        img_gpu = (masks.sum(dim=0) >= 1).float().expand(-1, -1, 3).contiguous()
+    else:
+        img_gpu *= 0
 
-        # This is 1 everywhere except for 1-mask_alpha where the mask is
-        inv_alph_masks = masks * (-mask_alpha) + 1
-        
-        # I did the math for this on pen and paper. This whole block should be equivalent to:
-        #    for j in range(num_dets_to_consider):
-        #        img_gpu = img_gpu * inv_alph_masks[j] + masks_color[j]
-        masks_color_summand = masks_color[0]
-        if num_dets_to_consider > 1:
-            inv_alph_cumul = inv_alph_masks[:(num_dets_to_consider-1)].cumprod(dim=0)
-            masks_color_cumul = masks_color[1:] * inv_alph_cumul
-            masks_color_summand += masks_color_cumul.sum(dim=0)
-
-        img_gpu = img_gpu * inv_alph_masks.prod(dim=0) + masks_color_summand
-    
     if args.display_fps:
             # Draw the box for the fps on the GPU
         font_face = cv2.FONT_HERSHEY_DUPLEX
@@ -222,6 +213,10 @@ def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, ma
     # Then draw the stuff that needs to be done on the cpu
     # Note, make sure this is a uint8 tensor or opencv will not anti alias text for whatever reason
     img_numpy = (img_gpu * 255).byte().cpu().numpy()
+
+    #cv2.imwrite('images/output/', args.images + '.jpg', img_numpy)
+
+    print(args.image, args.images)
 
     if args.display_fps:
         # Draw the text on the CPU
@@ -244,6 +239,7 @@ def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, ma
 
             if args.display_text:
                 _class = cfg.dataset.class_names[classes[j]]
+
                 text_str = '%s: %.2f' % (_class, score) if args.display_scores else _class
 
                 font_face = cv2.FONT_HERSHEY_DUPLEX
@@ -257,6 +253,8 @@ def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, ma
 
                 cv2.rectangle(img_numpy, (x1, y1), (x1 + text_w, y1 - text_h - 4), color, -1)
                 cv2.putText(img_numpy, text_str, text_pt, font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
+
+
             
     
     return img_numpy
@@ -614,7 +612,7 @@ def evalimages(net:Yolact, input_folder:str, output_folder:str):
         os.mkdir(output_folder)
 
     print()
-    for p in Path(input_folder).glob('*'): 
+    for p in Path(input_folder).glob('*'):
         path = str(p)
         name = os.path.basename(path)
         name = '.'.join(name.split('.')[:-1]) + '.png'

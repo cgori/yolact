@@ -131,15 +131,15 @@ dataset_base = Config({
 my_custom_dataset = dataset_base.copy({
     'name': 'My Dataset',
 
-    'train_images': 'data/oo/',
-    'train_info':   'data/oo/annotations.json',
+    'train_images': 'data/labels_coco/JPEGImages/',
+    'train_info':   'data/labels_coco/annotations.json',
 
 
-    'valid_images': 'data/oo/',
-    'valid_info':   'data/oo/annotations.json',
+    'valid_images': 'data/labels_coco/JPEGImages/',
+    'valid_info':   'data/labels_coco/annotations.json',
     'has_gt': True,
 
-    'class_names': ("pcat")
+    'class_names': ("cat_profile")
 
 })
 

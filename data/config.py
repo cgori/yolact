@@ -673,7 +673,7 @@ yolact_base_config = coco_base_config.copy({
 
     # Dataset stuff
     'dataset': my_custom_dataset,
-    'num_classes': len(my_custom_dataset.class_names),
+    'num_classes': len(my_custom_dataset.class_names)+1,
 
     # Image Size
     'max_size': 550,
@@ -684,7 +684,7 @@ yolact_base_config = coco_base_config.copy({
 
     # Backbone Settings
     'backbone': resnet101_backbone.copy({
-        'selected_layers': list(range(1, 4)),
+        'selected_layers': 1,
         'use_pixel_scales': True,
         'preapply_sqrt': False,
         'use_square_anchors': True, # This is for backward compatability with a bug
